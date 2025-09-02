@@ -106,16 +106,16 @@ return [
         'artists.showById' => 21600,       // 6 hours
         'artists.show.tracks' => 21600,    // 6 hours
         'artists.show.albums' => 21600,    // 6 hours
-        
+
         // Album & Track routes
         'albums.show' => 21600,            // 6 hours
         'tracks.show' => 21600,            // 6 hours
-        
+
         // Home & Charts
         'home.show' => 300,                // 5 minutes
         'chart.artists' => 86400,          // 24 hours
         'chart.tracks' => 86400,           // 24 hours
-        
+
         // Other cacheable routes from responsecache config
         'contact.show' => 259200,          // 3 days
         'page.show' => 259200,             // 3 days
