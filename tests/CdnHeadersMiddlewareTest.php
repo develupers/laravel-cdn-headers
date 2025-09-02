@@ -85,13 +85,14 @@ it('matches wildcard route patterns', function () {
         $response = new Response('test content');
         // Set a default header that middleware should override
         $response->headers->set('Cache-Control', 'no-cache, private');
+
         return $response;
     });
 
     // Debug output
     $routeName = $request->route()?->getName();
     expect($routeName)->toBe('products.index');
-    
+
     expect($response->headers->get('Cache-Control'))->toContain('public');
     expect($response->headers->get('Cache-Control'))->toContain('max-age=7200');
     expect($response->headers->get('Cache-Control'))->toContain('s-maxage=7200');
