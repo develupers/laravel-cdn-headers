@@ -71,6 +71,49 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Inject CSRF Loader Script
+    |--------------------------------------------------------------------------
+    |
+    | When true, automatically injects JavaScript to load CSRF tokens
+    | dynamically on cached pages that need them.
+    |
+    */
+    'inject_csrf_loader' => env('CDN_HEADERS_INJECT_CSRF_LOADER', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSRF Loader Routes
+    |--------------------------------------------------------------------------
+    |
+    | Determines which routes should have the CSRF loader script injected.
+    | - 'auto': Inject on any route where CSRF tokens were removed
+    | - 'routes': Array of specific route names that need the loader
+    |
+    */
+    'csrf_loader_routes' => [
+        'auto' => true,  // Automatically inject where CSRF was removed
+
+        // Or specify exact routes (used when auto is false)
+        'routes' => [
+            // 'contact.show',
+            // 'auth.login',
+            // 'auth.register',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSRF Token Endpoint
+    |--------------------------------------------------------------------------
+    |
+    | The endpoint used to fetch fresh CSRF tokens via AJAX.
+    | This endpoint should return JSON with a 'csrf_token' field.
+    |
+    */
+    'csrf_endpoint' => env('CDN_HEADERS_CSRF_ENDPOINT', '/users/csrf-token'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Enable Logging
     |--------------------------------------------------------------------------
     |

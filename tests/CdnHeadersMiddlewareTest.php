@@ -275,7 +275,7 @@ it('removes csrf tokens from html responses when configured', function () {
 
     $content = $response->getContent();
     expect($content)->not->toContain('opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu');
-    expect($content)->toContain('<!-- CSRF token removed for caching -->');
+    expect($content)->toContain('<meta name="csrf-token" content="">');
     expect($content)->toContain('/* CSRF token removed for caching */');
 });
 
@@ -333,4 +333,123 @@ it('does not remove csrf tokens from json responses', function () {
 
     $content = $response->getContent();
     expect($content)->toContain('opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu');
+});
+
+it('injects csrf loader script when tokens are removed in auto mode', function () {
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.remove_csrf_tokens' => true,
+        'cdn-headers.inject_csrf_loader' => true,
+        'cdn-headers.csrf_loader_routes' => ['auto' => true],
+        'cdn-headers.csrf_endpoint' => '/api/csrf',
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $htmlContent = '<!DOCTYPE html>
+<html>
+<head>
+    <meta name="csrf-token" content="opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu">
+</head>
+<body>
+    <form method="POST">
+        <input type="hidden" name="_token" value="opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu">
+    </form>
+</body>
+</html>';
+
+    $response = $this->middleware->handle($request, function () use ($htmlContent) {
+        $response = new Response($htmlContent);
+        $response->headers->set('Content-Type', 'text/html');
+
+        return $response;
+    });
+
+    $content = $response->getContent();
+
+    // Check CSRF was removed - the token value should not be present
+    expect($content)->toContain('<meta name="csrf-token" content="">');
+    expect($content)->not->toContain('value="opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu"');
+
+    // Check loader script was injected
+    expect($content)->toContain("fetch('/api/csrf')");
+    expect($content)->toContain('csrf_token');
+    expect($content)->toContain('X-CSRF-TOKEN');
+});
+
+it('does not inject csrf loader when disabled', function () {
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.remove_csrf_tokens' => true,
+        'cdn-headers.inject_csrf_loader' => false,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $htmlContent = '<!DOCTYPE html>
+<html>
+<head>
+    <meta name="csrf-token" content="opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu">
+</head>
+<body>Test</body>
+</html>';
+
+    $response = $this->middleware->handle($request, function () use ($htmlContent) {
+        $response = new Response($htmlContent);
+        $response->headers->set('Content-Type', 'text/html');
+
+        return $response;
+    });
+
+    $content = $response->getContent();
+    expect($content)->not->toContain('fetch(');
+});
+
+it('injects csrf loader only on specified routes', function () {
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600, 'other.route' => 3600],
+        'cdn-headers.remove_csrf_tokens' => true,
+        'cdn-headers.inject_csrf_loader' => true,
+        'cdn-headers.csrf_loader_routes' => [
+            'auto' => false,
+            'routes' => ['test.route'],
+        ],
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+    Route::get('/other', fn () => 'test')->name('other.route');
+
+    // Test route that should have loader
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $htmlContent = '<!DOCTYPE html><html><body><form></form></body></html>';
+
+    $response = $this->middleware->handle($request, function () use ($htmlContent) {
+        $response = new Response($htmlContent);
+        $response->headers->set('Content-Type', 'text/html');
+
+        return $response;
+    });
+
+    expect($response->getContent())->toContain('fetch(');
+
+    // Test route that should NOT have loader
+    $request2 = Request::create('/other', 'GET');
+    $request2->setRouteResolver(fn () => Route::getRoutes()->match($request2));
+
+    $response2 = $this->middleware->handle($request2, function () use ($htmlContent) {
+        $response = new Response($htmlContent);
+        $response->headers->set('Content-Type', 'text/html');
+
+        return $response;
+    });
+
+    expect($response2->getContent())->not->toContain('fetch(');
 });

@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\Log;
 class CdnHeadersMiddleware
 {
     /**
+     * Track if CSRF tokens were removed from the response.
+     */
+    protected bool $csrfRemoved = false;
+
+    /**
      * Handle an incoming request.
      *
      * @return mixed
@@ -64,6 +69,11 @@ class CdnHeadersMiddleware
         // Remove CSRF tokens if configured
         if (config('cdn-headers.remove_csrf_tokens', true)) {
             $this->removeCsrfTokens($response);
+        }
+
+        // Inject CSRF loader if configured and tokens were removed
+        if (config('cdn-headers.inject_csrf_loader', true)) {
+            $this->injectCsrfLoader($response, $routeName);
         }
 
         // Apply custom headers
@@ -235,11 +245,12 @@ class CdnHeadersMiddleware
         }
 
         $content = $response->getContent();
+        $originalContent = $content;
 
         // Remove meta tag CSRF token
         $content = preg_replace(
             '/<meta\s+name=["\']csrf-token["\']\s+content=["\'][^"\']*["\']\s*\/?>/i',
-            '<!-- CSRF token removed for caching -->',
+            '<meta name="csrf-token" content="">',
             $content
         );
 
@@ -263,6 +274,127 @@ class CdnHeadersMiddleware
             'window._token = null /* CSRF token removed for caching */',
             $content
         );
+
+        // Remove CSRF tokens from form inputs
+        $content = preg_replace(
+            '/<input\s+([^>]*?)name=["\']_token["\']([^>]*?)value=["\'][^"\']*["\']([^>]*?)>/i',
+            '<input $1name="_token"$2value=""$3>',
+            $content
+        );
+
+        // Alternative pattern for form inputs (different attribute order)
+        $content = preg_replace(
+            '/<input\s+([^>]*?)value=["\'][^"\']*["\']([^>]*?)name=["\']_token["\']([^>]*?)>/i',
+            '<input $1value=""$2name="_token"$3>',
+            $content
+        );
+
+        // Track if tokens were actually removed
+        if ($content !== $originalContent) {
+            $this->csrfRemoved = true;
+        }
+
+        $response->setContent($content);
+    }
+
+    /**
+     * Inject CSRF loader script into HTML responses.
+     *
+     * @param  \Illuminate\Http\Response  $response
+     */
+    protected function injectCsrfLoader($response, ?string $routeName): void
+    {
+        // Only process HTML responses
+        $contentType = $response->headers->get('Content-Type', '');
+        if (! str_contains($contentType, 'text/html')) {
+            return;
+        }
+
+        // Check if we should inject the loader
+        $shouldInject = false;
+        $loaderConfig = config('cdn-headers.csrf_loader_routes', []);
+
+        if ($loaderConfig['auto'] ?? true) {
+            // Auto mode: inject if CSRF was removed
+            $shouldInject = $this->csrfRemoved;
+        } elseif ($routeName && isset($loaderConfig['routes'])) {
+            // Manual mode: check if route is in the list
+            foreach ($loaderConfig['routes'] as $pattern) {
+                if ($this->matchesPattern($routeName, $pattern)) {
+                    $shouldInject = true;
+                    break;
+                }
+            }
+        }
+
+        if (! $shouldInject) {
+            return;
+        }
+
+        $content = $response->getContent();
+        $endpoint = config('cdn-headers.csrf_endpoint', '/users/csrf-token');
+
+        $script = <<<'JS'
+<script>
+(function() {
+    // Check if forms exist or AJAX libraries are present
+    if (!document.querySelector('form') && !window.axios && typeof $ === 'undefined') return;
+    
+    // Load CSRF token
+    fetch('ENDPOINT_PLACEHOLDER')
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            var token = data.csrf_token || data.token;
+            if (!token) return;
+            
+            // Update or create meta tag
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) {
+                meta.content = token;
+            } else {
+                // Create meta tag if it doesn't exist
+                meta = document.createElement('meta');
+                meta.name = 'csrf-token';
+                meta.content = token;
+                document.head.appendChild(meta);
+            }
+            
+            // Update window.Laravel
+            if (typeof window.Laravel === 'object') {
+                window.Laravel.csrfToken = token;
+            } else {
+                window.Laravel = { csrfToken: token };
+            }
+            
+            // Update form inputs
+            document.querySelectorAll('input[name="_token"]').forEach(function(input) {
+                input.value = token;
+            });
+            
+            // Configure axios if present
+            if (window.axios) {
+                window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
+            }
+            
+            // Configure jQuery AJAX if present
+            if (typeof $ !== 'undefined' && $.ajaxSetup) {
+                $.ajaxSetup({
+                    headers: { 'X-CSRF-TOKEN': token }
+                });
+            }
+        })
+        .catch(function(error) {
+            console.error('Failed to load CSRF token:', error);
+        });
+})();
+</script>
+JS;
+
+        // Replace the endpoint placeholder
+        $script = str_replace('ENDPOINT_PLACEHOLDER', $endpoint, $script);
+
+        // Inject before closing body tag
+        $content = str_replace('</body>', $script."\n</body>", $content);
 
         $response->setContent($content);
     }

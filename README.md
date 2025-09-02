@@ -13,6 +13,7 @@ Automatically set proper cache-control headers for CDN caching in Laravel applic
 - 🔧 Flexible route-based configuration
 - 🛡️ Automatic session cookie removal for cacheable responses
 - 🔐 CSRF token removal for secure caching
+- 🔄 Automatic CSRF token restoration via AJAX
 - 🎯 Wildcard route patterns support
 - 📊 Cloudflare integration for cache purging
 - 🔍 Built-in debugging tools
@@ -164,6 +165,41 @@ CSRF tokens are removed from:
 - Other common CSRF token patterns
 
 **Important**: Only enable caching for public pages that don't require CSRF protection. Pages with forms should typically not be cached.
+
+### CSRF Token Auto-Loading
+
+When CSRF tokens are removed for caching, the package can automatically inject JavaScript to restore them via AJAX. This allows forms on cached pages to work correctly:
+
+```php
+'inject_csrf_loader' => true,  // Enable auto-injection
+
+'csrf_loader_routes' => [
+    'auto' => true,  // Inject on any page where CSRF was removed
+    
+    // Or specify exact routes (when auto is false)
+    'routes' => [
+        'contact.show',
+        'auth.login',
+        'auth.register',
+    ],
+],
+
+'csrf_endpoint' => '/users/csrf-token',  // Your CSRF endpoint
+```
+
+The injected script will:
+- Fetch a fresh CSRF token from your endpoint
+- Update the `<meta name="csrf-token">` tag (or create it if it doesn't exist)
+- Set `window.Laravel.csrfToken`
+- Update all form `_token` inputs
+- Configure axios and jQuery AJAX headers
+
+**Note**: You must have a CSRF token endpoint that returns JSON:
+```php
+Route::get('/users/csrf-token', function () {
+    return response()->json(['csrf_token' => csrf_token()]);
+});
+```
 
 ## Testing
 
