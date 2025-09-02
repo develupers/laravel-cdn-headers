@@ -2,9 +2,9 @@
 
 namespace Develupers\CdnHeaders\Tests;
 
+use Develupers\CdnHeaders\CdnHeadersServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
-use Develupers\CdnHeaders\CdnHeadersServiceProvider;
 
 class TestCase extends Orchestra
 {
