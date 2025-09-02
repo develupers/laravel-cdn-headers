@@ -20,17 +20,52 @@ Automatically set proper cache-control headers for CDN caching in Laravel applic
 
 ## Installation
 
-You can install the package via composer:
+### Install via Composer
+
+Since the package is not yet on Packagist, you need to add the GitHub repository to your `composer.json`:
 
 ```bash
-composer require develupers/laravel-cdn-headers
+composer config repositories.laravel-cdn-headers vcs https://github.com/develupers/laravel-cdn-headers
 ```
 
-Publish the configuration file:
+Then require the package:
 
 ```bash
-php artisan vendor:publish --tag="laravel-cdn-headers-config"
+composer require develupers/laravel-cdn-headers:dev-main
 ```
+
+### Publish Configuration
+
+After installation, publish the configuration file:
+
+```bash
+php artisan vendor:publish --provider="Develupers\CdnHeaders\CdnHeadersServiceProvider"
+```
+
+This will create a `config/cdn-headers.php` file where you can customize the package behavior.
+
+### Quick Start
+
+1. **Configure your cacheable routes** in `config/cdn-headers.php`:
+   ```php
+   'routes' => [
+       'home' => 300,           // 5 minutes
+       'products.*' => 3600,    // 1 hour for all product routes
+       'api.*' => 600,          // 10 minutes for all API routes
+   ],
+   ```
+
+2. **Verify configuration** with:
+   ```bash
+   php artisan cdn-headers:status
+   ```
+
+3. **Test a specific route** to see if it will be cached:
+   ```bash
+   php artisan cdn-headers:test /products
+   ```
+
+That's it! The middleware will automatically apply CDN headers to your configured routes.
 
 ## Configuration
 
