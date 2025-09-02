@@ -18,11 +18,11 @@ class CdnHeadersStatusCommand extends Command
 
         // Check if enabled
         $enabled = config('cdn-headers.enabled', true);
-        $this->line('Status: ' . ($enabled ? '<fg=green>Enabled</>' : '<fg=red>Disabled</>'));
+        $this->line('Status: '.($enabled ? '<fg=green>Enabled</>' : '<fg=red>Disabled</>'));
 
         // Registration mode
         $registration = config('cdn-headers.middleware_registration', 'manual');
-        $this->line('Registration: ' . ($registration === 'global' ? '<fg=green>Global (automatic)</>' : '<fg=yellow>Manual</>'));
+        $this->line('Registration: '.($registration === 'global' ? '<fg=green>Global (automatic)</>' : '<fg=yellow>Manual</>'));
 
         // Settings
         $this->newLine();
@@ -34,13 +34,13 @@ class CdnHeadersStatusCommand extends Command
                 ['Remove Cookies', config('cdn-headers.remove_cookies') ? 'Yes' : 'No'],
                 ['Remove Vary Cookie', config('cdn-headers.remove_vary_cookie') ? 'Yes' : 'No'],
                 ['Logging Enabled', config('cdn-headers.logging') ? 'Yes' : 'No'],
-                ['Default Duration', config('cdn-headers.default_duration') . ' seconds'],
+                ['Default Duration', config('cdn-headers.default_duration').' seconds'],
             ]
         );
 
         // Configured routes
         $routes = config('cdn-headers.routes', []);
-        if (!empty($routes)) {
+        if (! empty($routes)) {
             $this->newLine();
             $this->info('Configured Routes:');
             $routeData = [];
@@ -52,7 +52,7 @@ class CdnHeadersStatusCommand extends Command
 
         // URL patterns
         $patterns = config('cdn-headers.patterns', []);
-        if (!empty($patterns)) {
+        if (! empty($patterns)) {
             $this->newLine();
             $this->info('URL Patterns:');
             $patternData = [];
@@ -64,11 +64,11 @@ class CdnHeadersStatusCommand extends Command
 
         // Excluded routes
         $excluded = config('cdn-headers.excluded_routes', []);
-        if (!empty($excluded)) {
+        if (! empty($excluded)) {
             $this->newLine();
             $this->info('Excluded Routes:');
             foreach ($excluded as $route) {
-                $this->line('  - ' . $route);
+                $this->line('  - '.$route);
             }
         }
 
@@ -78,13 +78,13 @@ class CdnHeadersStatusCommand extends Command
     protected function formatDuration(int $seconds): string
     {
         if ($seconds < 60) {
-            return $seconds . ' seconds';
+            return $seconds.' seconds';
         } elseif ($seconds < 3600) {
-            return round($seconds / 60) . ' minutes';
+            return round($seconds / 60).' minutes';
         } elseif ($seconds < 86400) {
-            return round($seconds / 3600, 1) . ' hours';
+            return round($seconds / 3600, 1).' hours';
         } else {
-            return round($seconds / 86400, 1) . ' days';
+            return round($seconds / 86400, 1).' days';
         }
     }
 }
