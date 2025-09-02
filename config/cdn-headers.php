@@ -59,6 +59,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Remove CSRF Tokens
+    |--------------------------------------------------------------------------
+    |
+    | When true, removes CSRF tokens from HTML responses before caching.
+    | This prevents security issues where all users receive the same token.
+    | CSRF tokens should never be cached as they are unique per session.
+    |
+    */
+    'remove_csrf_tokens' => env('CDN_HEADERS_REMOVE_CSRF', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Enable Logging
     |--------------------------------------------------------------------------
     |
@@ -89,12 +101,29 @@ return [
     |
     */
     'routes' => [
-        // Examples:
-        // 'home' => 300,                    // 5 minutes
-        // 'products.index' => 3600,         // 1 hour
-        // 'products.show' => 7200,          // 2 hours
-        // 'products.*' => 3600,             // All product routes: 1 hour
-        // 'api.v1.*' => 600,                // All API v1 routes: 10 minutes
+        // Artist routes
+        'artists.show' => 21600,           // 6 hours
+        'artists.showById' => 21600,       // 6 hours
+        'artists.show.tracks' => 21600,    // 6 hours
+        'artists.show.albums' => 21600,    // 6 hours
+        
+        // Album & Track routes
+        'albums.show' => 21600,            // 6 hours
+        'tracks.show' => 21600,            // 6 hours
+        
+        // Home & Charts
+        'home.show' => 300,                // 5 minutes
+        'chart.artists' => 86400,          // 24 hours
+        'chart.tracks' => 86400,           // 24 hours
+        
+        // Other cacheable routes from responsecache config
+        'contact.show' => 259200,          // 3 days
+        'page.show' => 259200,             // 3 days
+        'hashtags.show' => 86400,          // 24 hours
+        'playlist.new-tracks' => 86400,    // 24 hours
+        'playlist.new-albums' => 86400,    // 24 hours
+        'search.index' => 3600,            // 1 hour
+        'users.show' => 21600,             // 6 hours
     ],
 
     /*

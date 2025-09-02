@@ -61,6 +61,11 @@ class CdnHeadersMiddleware
             $this->removeVaryCookie($response);
         }
 
+        // Remove CSRF tokens if configured
+        if (config('cdn-headers.remove_csrf_tokens', true)) {
+            $this->removeCsrfTokens($response);
+        }
+
         // Apply custom headers
         foreach (config('cdn-headers.custom_headers', []) as $header => $value) {
             $response->headers->set($header, $value);
@@ -216,5 +221,51 @@ class CdnHeadersMiddleware
         } else {
             $response->headers->remove('Vary');
         }
+    }
+
+    /**
+     * Remove CSRF tokens from HTML responses.
+     *
+     * @param  \Illuminate\Http\Response  $response
+     */
+    protected function removeCsrfTokens($response): void
+    {
+        // Only process HTML responses
+        $contentType = $response->headers->get('Content-Type', '');
+        if (! str_contains($contentType, 'text/html')) {
+            return;
+        }
+
+        $content = $response->getContent();
+
+        // Remove meta tag CSRF token
+        $content = preg_replace(
+            '/<meta\s+name=["\']csrf-token["\']\s+content=["\'][^"\']*["\']\s*\/?>/i',
+            '<!-- CSRF token removed for caching -->',
+            $content
+        );
+
+        // Remove JavaScript CSRF token in window.Laravel
+        $content = preg_replace(
+            '/<script>\s*window\.Laravel\s*=\s*\{[^}]*["\']csrfToken["\']\s*:\s*["\'][^"\']*["\'][^}]*\}[^<]*<\/script>/i',
+            '<script>window.Laravel = {/* CSRF token removed for caching */}</script>',
+            $content
+        );
+
+        // Alternative pattern for window.Laravel
+        $content = preg_replace(
+            '/window\.Laravel\s*=\s*\{[^}]*["\']csrfToken["\']\s*:\s*["\'][^"\']*["\'][^}]*\}/i',
+            'window.Laravel = {/* CSRF token removed for caching */}',
+            $content
+        );
+
+        // Remove standalone CSRF token assignments
+        $content = preg_replace(
+            '/window\._token\s*=\s*["\'][^"\']*["\']/i',
+            'window._token = null /* CSRF token removed for caching */',
+            $content
+        );
+
+        $response->setContent($content);
     }
 }

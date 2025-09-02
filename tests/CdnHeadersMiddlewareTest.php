@@ -230,3 +230,92 @@ it('applies custom headers when configured', function () {
     expect($response->headers->get('X-Cache-Status'))->toBe('CDN');
     expect($response->headers->get('X-Custom'))->toBe('Value');
 });
+
+it('removes csrf tokens from html responses when configured', function () {
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.remove_csrf_tokens' => true,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $htmlContent = '<!DOCTYPE html>
+<html>
+<head>
+    <meta name="csrf-token" content="opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu">
+    <script>window.Laravel = {"csrfToken": "opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu"}</script>
+</head>
+<body>Test</body>
+</html>';
+
+    $response = $this->middleware->handle($request, function () use ($htmlContent) {
+        $response = new Response($htmlContent);
+        $response->headers->set('Content-Type', 'text/html');
+
+        return $response;
+    });
+
+    $content = $response->getContent();
+    expect($content)->not->toContain('opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu');
+    expect($content)->toContain('<!-- CSRF token removed for caching -->');
+    expect($content)->toContain('/* CSRF token removed for caching */');
+});
+
+it('keeps csrf tokens when removal is disabled', function () {
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.remove_csrf_tokens' => false,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $htmlContent = '<!DOCTYPE html>
+<html>
+<head>
+    <meta name="csrf-token" content="opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu">
+    <script>window.Laravel = {"csrfToken": "opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu"}</script>
+</head>
+<body>Test</body>
+</html>';
+
+    $response = $this->middleware->handle($request, function () use ($htmlContent) {
+        $response = new Response($htmlContent);
+        $response->headers->set('Content-Type', 'text/html');
+
+        return $response;
+    });
+
+    $content = $response->getContent();
+    expect($content)->toContain('opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu');
+    expect($content)->toContain('<meta name="csrf-token"');
+});
+
+it('does not remove csrf tokens from json responses', function () {
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.remove_csrf_tokens' => true,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $jsonContent = json_encode(['csrf_token' => 'opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu']);
+
+    $response = $this->middleware->handle($request, function () use ($jsonContent) {
+        $response = new Response($jsonContent);
+        $response->headers->set('Content-Type', 'application/json');
+
+        return $response;
+    });
+
+    $content = $response->getContent();
+    expect($content)->toContain('opF3LuZjROz7Lhgmn7CwHc0GHAe9tClbtezTVZHu');
+});

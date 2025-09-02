@@ -12,6 +12,7 @@ Automatically set proper cache-control headers for CDN caching in Laravel applic
 - 🚀 Automatic cache-control header management
 - 🔧 Flexible route-based configuration
 - 🛡️ Automatic session cookie removal for cacheable responses
+- 🔐 CSRF token removal for secure caching
 - 🎯 Wildcard route patterns support
 - 📊 Cloudflare integration for cache purging
 - 🔍 Built-in debugging tools
@@ -105,6 +106,9 @@ return [
         'admin.*',
         'dashboard.*',
     ],
+    
+    // Security settings
+    'remove_csrf_tokens' => true,    // Remove CSRF tokens from cached pages
 ];
 ```
 
@@ -143,6 +147,23 @@ Clear CDN cache (Cloudflare):
 php artisan cdn-headers:clear --all
 php artisan cdn-headers:clear --url=https://example.com/products
 ```
+
+## Security Considerations
+
+### CSRF Token Removal
+
+When `remove_csrf_tokens` is enabled (default), the package automatically removes CSRF tokens from HTML responses before caching. This is crucial because:
+
+- **Security**: Prevents all users from receiving the same CSRF token
+- **Cache Effectiveness**: Allows CDNs to properly cache pages
+- **Session Independence**: Cached pages work regardless of user sessions
+
+CSRF tokens are removed from:
+- `<meta name="csrf-token" content="...">` tags
+- `window.Laravel = {"csrfToken": "..."}` JavaScript objects
+- Other common CSRF token patterns
+
+**Important**: Only enable caching for public pages that don't require CSRF protection. Pages with forms should typically not be cached.
 
 ## Testing
 
