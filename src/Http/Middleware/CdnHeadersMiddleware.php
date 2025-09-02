@@ -139,11 +139,9 @@ class CdnHeadersMiddleware
     protected function matchesPattern(string $routeName, string $pattern): bool
     {
         // Convert wildcard pattern to regex
-        $regex = str_replace(
-            ['*', '.'],
-            ['.*', '\.'],
-            $pattern
-        );
+        // First escape dots, then convert asterisks to regex wildcards
+        $regex = str_replace('.', '\.', $pattern);
+        $regex = str_replace('*', '.*', $regex);
 
         return (bool) preg_match('/^'.$regex.'$/', $routeName);
     }
