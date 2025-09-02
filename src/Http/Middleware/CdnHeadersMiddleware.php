@@ -5,15 +5,12 @@ namespace Develupers\CdnHeaders\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class CdnHeadersMiddleware
 {
     /**
      * Handle an incoming request.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
      * @return mixed
      */
     public function handle(Request $request, Closure $next)
@@ -21,12 +18,12 @@ class CdnHeadersMiddleware
         $response = $next($request);
 
         // Check if middleware is enabled
-        if (!config('cdn-headers.enabled', true)) {
+        if (! config('cdn-headers.enabled', true)) {
             return $response;
         }
 
         // Early return for non-GET/HEAD requests
-        if (!$request->isMethod('GET') && !$request->isMethod('HEAD')) {
+        if (! $request->isMethod('GET') && ! $request->isMethod('HEAD')) {
             return $response;
         }
 
@@ -84,9 +81,6 @@ class CdnHeadersMiddleware
 
     /**
      * Check if route is excluded.
-     *
-     * @param  string  $routeName
-     * @return bool
      */
     protected function isRouteExcluded(string $routeName): bool
     {
@@ -103,10 +97,6 @@ class CdnHeadersMiddleware
 
     /**
      * Get cache duration for route.
-     *
-     * @param  string|null  $routeName
-     * @param  string  $path
-     * @return int|null
      */
     protected function getCacheDuration(?string $routeName, string $path): ?int
     {
@@ -140,10 +130,6 @@ class CdnHeadersMiddleware
 
     /**
      * Check if route name matches pattern.
-     *
-     * @param  string  $routeName
-     * @param  string  $pattern
-     * @return bool
      */
     protected function matchesPattern(string $routeName, string $pattern): bool
     {
@@ -154,21 +140,17 @@ class CdnHeadersMiddleware
             $pattern
         );
 
-        return (bool) preg_match('/^' . $regex . '$/', $routeName);
+        return (bool) preg_match('/^'.$regex.'$/', $routeName);
     }
 
     /**
      * Check if URL path matches pattern.
-     *
-     * @param  string  $path
-     * @param  string  $pattern
-     * @return bool
      */
     protected function matchesUrlPattern(string $path, string $pattern): bool
     {
         // Normalize paths
-        $path = '/' . ltrim($path, '/');
-        $pattern = '/' . ltrim($pattern, '/');
+        $path = '/'.ltrim($path, '/');
+        $pattern = '/'.ltrim($pattern, '/');
 
         // Convert wildcard pattern to regex
         $regex = str_replace(
@@ -177,15 +159,13 @@ class CdnHeadersMiddleware
             $pattern
         );
 
-        return (bool) preg_match('/^' . $regex . '$/', $path);
+        return (bool) preg_match('/^'.$regex.'$/', $path);
     }
 
     /**
      * Apply CDN headers to response.
      *
      * @param  \Illuminate\Http\Response  $response
-     * @param  int  $duration
-     * @return void
      */
     protected function applyCdnHeaders($response, int $duration): void
     {
@@ -217,13 +197,12 @@ class CdnHeadersMiddleware
      * Remove Cookie from Vary header.
      *
      * @param  \Illuminate\Http\Response  $response
-     * @return void
      */
     protected function removeVaryCookie($response): void
     {
         $vary = $response->headers->get('Vary', '');
 
-        if (!$vary) {
+        if (! $vary) {
             return;
         }
 
@@ -232,7 +211,7 @@ class CdnHeadersMiddleware
             return strtolower($part) !== 'cookie';
         });
 
-        if (!empty($varyParts)) {
+        if (! empty($varyParts)) {
             $response->headers->set('Vary', implode(', ', $varyParts));
         } else {
             $response->headers->remove('Vary');

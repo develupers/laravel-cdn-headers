@@ -31,12 +31,13 @@ class CdnHeadersTestCommand extends Command
                 return $route;
             });
         } catch (\Exception $e) {
-            $this->error('Could not match route for URL: ' . $url);
+            $this->error('Could not match route for URL: '.$url);
+
             return self::FAILURE;
         }
 
         $routeName = $route->getName();
-        $this->line('Matched Route: ' . ($routeName ?: '<no name>'));
+        $this->line('Matched Route: '.($routeName ?: '<no name>'));
 
         // Check if route is configured
         $routes = config('cdn-headers.routes', []);
@@ -54,6 +55,7 @@ class CdnHeadersTestCommand extends Command
 
         if ($isExcluded) {
             $this->warn('⚠ This route is EXCLUDED from CDN caching');
+
             return self::SUCCESS;
         }
 
@@ -68,7 +70,7 @@ class CdnHeadersTestCommand extends Command
         }
 
         // Check route patterns
-        if (!$duration && $routeName) {
+        if (! $duration && $routeName) {
             foreach ($routes as $pattern => $d) {
                 if ($this->matchesPattern($routeName, $pattern)) {
                     $duration = $d;
@@ -79,7 +81,7 @@ class CdnHeadersTestCommand extends Command
         }
 
         // Check URL patterns
-        if (!$duration) {
+        if (! $duration) {
             $path = parse_url($url, PHP_URL_PATH) ?: '/';
             foreach ($patterns as $pattern => $d) {
                 if ($this->matchesUrlPattern($path, $pattern)) {
@@ -92,8 +94,8 @@ class CdnHeadersTestCommand extends Command
 
         if ($duration) {
             $this->info('✓ This route WILL have CDN headers');
-            $this->line('Matched by: ' . $matchedBy);
-            $this->line('Cache duration: ' . $this->formatDuration($duration));
+            $this->line('Matched by: '.$matchedBy);
+            $this->line('Cache duration: '.$this->formatDuration($duration));
 
             $this->newLine();
             $this->info('Headers that will be set:');
@@ -133,19 +135,21 @@ class CdnHeadersTestCommand extends Command
             ['.*', '\.'],
             $pattern
         );
-        return (bool) preg_match('/^' . $regex . '$/', $routeName);
+
+        return (bool) preg_match('/^'.$regex.'$/', $routeName);
     }
 
     protected function matchesUrlPattern(string $path, string $pattern): bool
     {
-        $path = '/' . ltrim($path, '/');
-        $pattern = '/' . ltrim($pattern, '/');
+        $path = '/'.ltrim($path, '/');
+        $pattern = '/'.ltrim($pattern, '/');
         $regex = str_replace(
             ['*', '/'],
             ['[^/]*', '\/'],
             $pattern
         );
-        return (bool) preg_match('/^' . $regex . '$/', $path);
+
+        return (bool) preg_match('/^'.$regex.'$/', $path);
     }
 
     protected function buildCacheControl(int $duration): string
@@ -170,13 +174,13 @@ class CdnHeadersTestCommand extends Command
     protected function formatDuration(int $seconds): string
     {
         if ($seconds < 60) {
-            return $seconds . ' seconds';
+            return $seconds.' seconds';
         } elseif ($seconds < 3600) {
-            return round($seconds / 60) . ' minutes';
+            return round($seconds / 60).' minutes';
         } elseif ($seconds < 86400) {
-            return round($seconds / 3600, 1) . ' hours';
+            return round($seconds / 3600, 1).' hours';
         } else {
-            return round($seconds / 86400, 1) . ' days';
+            return round($seconds / 86400, 1).' days';
         }
     }
 }

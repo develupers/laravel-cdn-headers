@@ -6,7 +6,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 
 beforeEach(function () {
-    $this->middleware = new CdnHeadersMiddleware();
+    $this->middleware = new CdnHeadersMiddleware;
 });
 
 it('adds cdn headers to configured routes', function () {
@@ -14,10 +14,10 @@ it('adds cdn headers to configured routes', function () {
         'test.route' => 3600,
     ]]);
 
-    Route::get('/test', fn() => 'test')->name('test.route');
+    Route::get('/test', fn () => 'test')->name('test.route');
 
     $request = Request::create('/test', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');
@@ -32,14 +32,15 @@ it('removes cookies when configured', function () {
         'cdn-headers.remove_cookies' => true,
     ]);
 
-    Route::get('/test', fn() => 'test')->name('test.route');
+    Route::get('/test', fn () => 'test')->name('test.route');
 
     $request = Request::create('/test', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         $response = new Response('test content');
         $response->headers->set('Set-Cookie', 'test=value');
+
         return $response;
     });
 
@@ -52,13 +53,13 @@ it('skips authenticated users when configured', function () {
         'cdn-headers.skip_authenticated' => true,
     ]);
 
-    Route::get('/test', fn() => 'test')->name('test.route');
+    Route::get('/test', fn () => 'test')->name('test.route');
 
     // Mock authenticated user
     $this->actingAs(Mockery::mock('User'));
 
     $request = Request::create('/test', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');
@@ -72,10 +73,10 @@ it('matches wildcard route patterns', function () {
         'products.*' => 7200,
     ]]);
 
-    Route::get('/products', fn() => 'test')->name('products.index');
+    Route::get('/products', fn () => 'test')->name('products.index');
 
     $request = Request::create('/products', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');
@@ -104,10 +105,10 @@ it('excludes configured routes', function () {
         'cdn-headers.excluded_routes' => ['admin.*'],
     ]);
 
-    Route::get('/admin', fn() => 'test')->name('admin.dashboard');
+    Route::get('/admin', fn () => 'test')->name('admin.dashboard');
 
     $request = Request::create('/admin', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');
@@ -119,10 +120,10 @@ it('excludes configured routes', function () {
 it('only processes get and head requests', function () {
     config(['cdn-headers.routes' => ['test.route' => 3600]]);
 
-    Route::post('/test', fn() => 'test')->name('test.route');
+    Route::post('/test', fn () => 'test')->name('test.route');
 
     $request = Request::create('/test', 'POST');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');
@@ -138,10 +139,10 @@ it('adds stale directives when configured', function () {
         'cdn-headers.stale_if_error' => 604800,
     ]);
 
-    Route::get('/test', fn() => 'test')->name('test.route');
+    Route::get('/test', fn () => 'test')->name('test.route');
 
     $request = Request::create('/test', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');
@@ -157,10 +158,10 @@ it('adds surrogate control when configured', function () {
         'cdn-headers.surrogate_control' => true,
     ]);
 
-    Route::get('/test', fn() => 'test')->name('test.route');
+    Route::get('/test', fn () => 'test')->name('test.route');
 
     $request = Request::create('/test', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');
@@ -175,14 +176,15 @@ it('removes vary cookie header when configured', function () {
         'cdn-headers.remove_vary_cookie' => true,
     ]);
 
-    Route::get('/test', fn() => 'test')->name('test.route');
+    Route::get('/test', fn () => 'test')->name('test.route');
 
     $request = Request::create('/test', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         $response = new Response('test content');
         $response->headers->set('Vary', 'Accept-Encoding, Cookie');
+
         return $response;
     });
 
@@ -195,10 +197,10 @@ it('can be disabled via config', function () {
         'cdn-headers.routes' => ['test.route' => 3600],
     ]);
 
-    Route::get('/test', fn() => 'test')->name('test.route');
+    Route::get('/test', fn () => 'test')->name('test.route');
 
     $request = Request::create('/test', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');
@@ -216,10 +218,10 @@ it('applies custom headers when configured', function () {
         ],
     ]);
 
-    Route::get('/test', fn() => 'test')->name('test.route');
+    Route::get('/test', fn () => 'test')->name('test.route');
 
     $request = Request::create('/test', 'GET');
-    $request->setRouteResolver(fn() => Route::getRoutes()->match($request));
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
 
     $response = $this->middleware->handle($request, function () {
         return new Response('test content');

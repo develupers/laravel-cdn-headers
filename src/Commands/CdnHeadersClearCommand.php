@@ -20,19 +20,21 @@ class CdnHeadersClearCommand extends Command
         $zoneId = $this->option('zone') ?: env('CLOUDFLARE_ZONE_ID');
         $token = $this->option('token') ?: env('CLOUDFLARE_API_TOKEN');
 
-        if (!$zoneId || !$token) {
+        if (! $zoneId || ! $token) {
             $this->error('Cloudflare Zone ID and API Token are required.');
             $this->line('Set them via --zone and --token options, or in your .env file:');
             $this->line('CLOUDFLARE_ZONE_ID=your-zone-id');
             $this->line('CLOUDFLARE_API_TOKEN=your-api-token');
+
             return self::FAILURE;
         }
 
         $urls = $this->option('url');
         $purgeAll = $this->option('all');
 
-        if (!$purgeAll && empty($urls)) {
+        if (! $purgeAll && empty($urls)) {
             $this->error('Please specify URLs to purge with --url or use --all to purge everything.');
+
             return self::FAILURE;
         }
 
@@ -52,7 +54,7 @@ class CdnHeadersClearCommand extends Command
                 } else {
                     $this->line('Purged URLs:');
                     foreach ($urls as $url) {
-                        $this->line('  - ' . $url);
+                        $this->line('  - '.$url);
                     }
                 }
 
@@ -63,10 +65,12 @@ class CdnHeadersClearCommand extends Command
                 foreach ($errors as $error) {
                     $this->error($error['message'] ?? 'Unknown error');
                 }
+
                 return self::FAILURE;
             }
         } catch (\Exception $e) {
-            $this->error('Error communicating with Cloudflare API: ' . $e->getMessage());
+            $this->error('Error communicating with Cloudflare API: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }
