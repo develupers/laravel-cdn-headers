@@ -239,4 +239,17 @@ return [
     |
     */
     'stale_if_error' => env('CDN_HEADERS_SIE', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cloudflare Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for Cloudflare CDN cache management.
+    |
+    */
+    'cloudflare' => [
+        'zone_id' => env('CLOUDFLARE_ZONE_ID'),
+        'api_token' => env('CLOUDFLARE_API_TOKEN'),
+    ],
 ];

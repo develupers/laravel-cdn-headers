@@ -17,8 +17,8 @@ class CdnHeadersClearCommand extends Command
 
     public function handle(): int
     {
-        $zoneId = $this->option('zone') ?: env('CLOUDFLARE_ZONE_ID');
-        $token = $this->option('token') ?: env('CLOUDFLARE_API_TOKEN');
+        $zoneId = $this->option('zone') ?: config('cdn-headers.cloudflare.zone_id');
+        $token = $this->option('token') ?: config('cdn-headers.cloudflare.api_token');
 
         if (! $zoneId || ! $token) {
             $this->error('Cloudflare Zone ID and API Token are required.');

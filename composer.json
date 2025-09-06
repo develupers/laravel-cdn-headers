@@ -63,10 +63,7 @@
         "laravel": {
             "providers": [
                 "Develupers\\CdnHeaders\\CdnHeadersServiceProvider"
-            ],
-            "aliases": {
-                "CdnHeaders": "Develupers\\CdnHeaders\\Facades\\CdnHeaders"
-            }
+            ]
         }
     },
     "minimum-stability": "dev",
