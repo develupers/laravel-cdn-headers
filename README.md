@@ -131,6 +131,131 @@ protected $middleware = [
 ];
 ```
 
+**Note**: The middleware automatically detects authenticated users and sends appropriate cache headers (`private` for logged-in, `public` for anonymous).
+
+### Cloudflare Setup
+
+When using Cloudflare as your CDN, you need to configure cache bypass rules for authenticated users. This prevents logged-in users from receiving cached anonymous pages.
+
+#### Why Cloudflare Configuration is Needed
+
+Cloudflare's edge servers don't process PHP or Laravel sessions. When a page is cached, Cloudflare serves it to everyone who requests that URL, regardless of authentication status. To fix this, you need to tell Cloudflare when to bypass the cache.
+
+#### Step 1: Create Cache Eligibility Rules
+
+By default, Cloudflare only caches static assets (JS, CSS, images). To enable HTML caching while respecting your Laravel cache headers:
+
+1. Go to your Cloudflare Dashboard
+2. Navigate to **Caching** → **Cache Rules**
+3. Click **Create rule**
+4. Configure the rule:
+
+   **Rule name**: `Enable HTML Caching`
+   
+   **When incoming requests match...**
+   - Field: `URI Path`
+   - Operator: `equals` (or use `starts with` for multiple paths)
+   - Value: `/` (or specify paths you want cached, e.g., `/song/*`)
+   
+   **Then...**
+   - **Cache eligibility**: `Eligible for cache`
+   - **Edge TTL**: 
+     - Select: `Use cache-control header if present, bypass cache if not`
+     
+5. Click **Deploy**
+
+**How this works**:
+- Cloudflare will respect the `Cache-Control` headers from your Laravel application
+- Pages with `Cache-Control: public` get cached (anonymous users)
+- Pages with `Cache-Control: private` bypass cache (logged-in users)
+- Your `cdn-headers.php` config remains in control of cache durations
+
+#### Step 2: Create Cache Bypass Rule for Authenticated Users
+
+To ensure authenticated users always receive fresh, personalized content:
+
+1. Go to your Cloudflare Dashboard
+2. Navigate to **Caching** → **Cache Rules**
+3. Click **Create rule**
+4. Configure the rule:
+
+   **Rule name**: `Laravel Login Bypass`
+   
+   **If incoming requests match...**
+   - Select: `Custom filter expression`
+   
+   **When incoming requests match...**
+   - Field: `Cookie`
+   - Operator: `contains`
+   - Value: `remember_web_`
+   
+   **Then...**
+   - **Cache eligibility**: `Bypass cache`
+   
+5. Click **Deploy**
+
+**Why this works**: The `remember_web_*` cookie is only present for authenticated Laravel users. This rule ensures they always bypass Cloudflare's cache and get fresh content from your origin server.
+
+#### Step 3: Understanding the Cookie Pattern
+
+Laravel uses different cookies for session management:
+
+- `laravel_session`: Present for ALL users (authenticated and anonymous)
+- `remember_web_*`: ONLY present for authenticated users who checked "Remember Me"
+- `XSRF-TOKEN`: CSRF protection token (present for all users)
+
+The `remember_web_*` cookie is the most reliable indicator of an authenticated user.
+
+#### Alternative: Session-Based Bypass
+
+If your application doesn't use "Remember Me" functionality, you may need to:
+
+1. Set a custom cookie when users log in:
+   ```php
+   // In your login controller
+   Cookie::queue('authenticated', '1', 60 * 24 * 30);
+   ```
+
+2. Clear it on logout:
+   ```php
+   // In your logout controller
+   Cookie::queue(Cookie::forget('authenticated'));
+   ```
+
+3. Use this custom cookie in your Cloudflare rule instead
+
+#### Step 4: Verify Your Configuration
+
+After setting up the Cloudflare rule:
+
+1. **Test as anonymous user**: Page should be served from cache (`cf-cache-status: HIT`)
+2. **Test as logged-in user**: Page should bypass cache (`cf-cache-status: BYPASS`)
+3. **Clear Cloudflare cache** after making changes to ensure fresh start
+
+#### Troubleshooting
+
+**Issue**: Logged-in users still see cached pages
+- **Solution**: Ensure the Cloudflare rule is active and matches your cookie pattern
+- **Check**: Browser DevTools → Application → Cookies to verify cookie presence
+
+**Issue**: Pages aren't being cached at all
+- **Solution**: Check that `skip_authenticated` is `true` in your config
+- **Verify**: Response headers should include `Cache-Control: public` for anonymous users
+
+**Issue**: CSRF token errors on cached pages
+- **Solution**: Enable `inject_csrf_loader` in config to dynamically load tokens
+- **Note**: Ensure your CSRF endpoint is excluded from caching
+
+#### Important Notes
+
+1. **Two-Part Solution**: You need BOTH:
+   - Cloudflare rules (to bypass cache for existing cached content)
+   - Proper middleware configuration (to prevent future bad caches)
+
+2. **Cache Purging**: After implementing these changes, purge your Cloudflare cache to remove any incorrectly cached authenticated pages
+
+3. **Performance Impact**: Authenticated users will always hit your origin server, which is intentional to serve personalized content
+
 ### Artisan Commands
 
 Check configuration status:
