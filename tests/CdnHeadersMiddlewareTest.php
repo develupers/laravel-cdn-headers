@@ -1,6 +1,7 @@
 <?php
 
 use Develupers\CdnHeaders\Http\Middleware\CdnHeadersMiddleware;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
@@ -58,7 +59,7 @@ it('skips authenticated users when configured', function () {
     Route::get('/test', fn () => 'test')->name('test.route');
 
     // Mock authenticated user
-    $user = Mockery::mock(\Illuminate\Contracts\Auth\Authenticatable::class);
+    $user = Mockery::mock(Authenticatable::class);
     $this->actingAs($user);
 
     $request = Request::create('/test', 'GET');

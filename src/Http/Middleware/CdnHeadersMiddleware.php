@@ -4,6 +4,7 @@ namespace Develupers\CdnHeaders\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 
 class CdnHeadersMiddleware
@@ -269,7 +270,7 @@ class CdnHeadersMiddleware
     /**
      * Apply CDN headers to response.
      *
-     * @param  \Illuminate\Http\Response  $response
+     * @param  Response  $response
      */
     protected function applyCdnHeaders($response, int $edgeTtl, ?int $browserTtl = null): void
     {
@@ -304,7 +305,7 @@ class CdnHeadersMiddleware
     /**
      * Remove Cookie from Vary header.
      *
-     * @param  \Illuminate\Http\Response  $response
+     * @param  Response  $response
      */
     protected function removeVaryCookie($response): void
     {
@@ -329,7 +330,7 @@ class CdnHeadersMiddleware
     /**
      * Remove CSRF tokens from HTML responses.
      *
-     * @param  \Illuminate\Http\Response  $response
+     * @param  Response  $response
      */
     protected function removeCsrfTokens($response): void
     {
@@ -395,7 +396,7 @@ class CdnHeadersMiddleware
     /**
      * Inject CSRF loader script into HTML responses.
      *
-     * @param  \Illuminate\Http\Response  $response
+     * @param  Response  $response
      */
     protected function injectCsrfLoader($response, ?string $routeName): void
     {
