@@ -252,4 +252,36 @@ return [
         'zone_id' => env('CLOUDFLARE_ZONE_ID'),
         'api_token' => env('CLOUDFLARE_API_TOKEN'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Error Response Caching
+    |--------------------------------------------------------------------------
+    |
+    | Controls how non-2xx responses are cached. Without these limits, error
+    | pages get the same long TTL as successful pages, which is dangerous:
+    | a transient 404 or 5xx response can be cached for hours and served to
+    | every other client sharing the same cache key.
+    |
+    | For 4xx and 3xx the middleware uses a separate edge_ttl (shared cache)
+    | and browser_ttl (per-user cache). A common pattern is to keep a short
+    | edge_ttl (CDN-side origin protection against bot scans) and browser_ttl
+    | of 0 (so users refetch on each visit and don't stay stuck on a stale
+    | error if the resource appears later).
+    |
+    | 5xx responses are never cached when cache_5xx is false (recommended);
+    | transient origin errors should never propagate to other clients.
+    |
+    */
+    'error_responses' => [
+        'cache_3xx' => env('CDN_HEADERS_CACHE_3XX', true),
+        'cache_4xx' => env('CDN_HEADERS_CACHE_4XX', true),
+        'cache_5xx' => env('CDN_HEADERS_CACHE_5XX', false),
+
+        'edge_ttl_3xx' => env('CDN_HEADERS_EDGE_TTL_3XX', 600),    // 10 minutes
+        'edge_ttl_4xx' => env('CDN_HEADERS_EDGE_TTL_4XX', 300),    // 5 minutes
+
+        'browser_ttl_3xx' => env('CDN_HEADERS_BROWSER_TTL_3XX', 0),
+        'browser_ttl_4xx' => env('CDN_HEADERS_BROWSER_TTL_4XX', 0),
+    ],
 ];

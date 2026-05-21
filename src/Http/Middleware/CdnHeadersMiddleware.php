@@ -37,6 +37,14 @@ class CdnHeadersMiddleware
             return $response;
         }
 
+        // Respect explicit no-store from inner code. Inner middleware (e.g. a
+        // bot-detection middleware returning 403) may already have set
+        // no-store to prevent the response being cached anywhere. Overwriting
+        // that would silently neuter the inner intent and risk cache poisoning.
+        if ($this->responseHasNoStore($response)) {
+            return $response;
+        }
+
         // Get route name and path
         $routeName = $request->route()?->getName();
         $path = $request->path();
@@ -53,8 +61,16 @@ class CdnHeadersMiddleware
             return $response;
         }
 
+        // Resolve effective edge / browser TTLs based on response status.
+        // Returns null when the status should not be cached at all (e.g. 5xx).
+        $ttls = $this->resolveCacheTtls($response->getStatusCode(), $duration);
+
+        if ($ttls === null) {
+            return $response;
+        }
+
         // Apply CDN headers
-        $this->applyCdnHeaders($response, $duration);
+        $this->applyCdnHeaders($response, $ttls['edge'], $ttls['browser']);
 
         // Remove cookies if configured
         if (config('cdn-headers.remove_cookies', true)) {
@@ -86,7 +102,9 @@ class CdnHeadersMiddleware
             Log::info('CDN Headers Applied', [
                 'route' => $routeName,
                 'path' => $path,
-                'duration' => $duration,
+                'status' => $response->getStatusCode(),
+                'edge_ttl' => $ttls['edge'],
+                'browser_ttl' => $ttls['browser'],
                 'cache-control' => $response->headers->get('Cache-Control'),
             ]);
         }
@@ -176,16 +194,92 @@ class CdnHeadersMiddleware
     }
 
     /**
+     * Check whether the response already explicitly forbids caching.
+     *
+     * Only the strict `no-store` directive is honored here — `no-cache` and
+     * `private` are weaker (and often present as Laravel defaults), so we
+     * still override those. Inner code that genuinely wants the response
+     * uncached anywhere should send `no-store`.
+     *
+     * @param  \Symfony\Component\HttpFoundation\Response  $response
+     */
+    protected function responseHasNoStore($response): bool
+    {
+        $cacheControl = $response->headers->get('Cache-Control', '');
+
+        if ($cacheControl === '' || $cacheControl === null) {
+            return false;
+        }
+
+        return str_contains(strtolower($cacheControl), 'no-store');
+    }
+
+    /**
+     * Resolve the effective edge and browser TTLs for a given response status.
+     *
+     * Returns null when the status should not be cached at all.
+     *
+     * For successful (2xx) responses the configured duration is used for both
+     * edge and browser caching. For 3xx and 4xx, the caller's duration is
+     * replaced with shorter status-specific TTLs from config (origin protection
+     * without locking users into stale errors). 5xx responses are not cached
+     * by default — transient origin errors must not propagate to other clients.
+     *
+     * @return array{edge: int, browser: int}|null
+     */
+    protected function resolveCacheTtls(int $statusCode, int $defaultDuration): ?array
+    {
+        // 2xx — full caching with the configured duration
+        if ($statusCode < 300) {
+            return ['edge' => $defaultDuration, 'browser' => $defaultDuration];
+        }
+
+        // 5xx — never cache by default
+        if ($statusCode >= 500) {
+            if (! config('cdn-headers.error_responses.cache_5xx', false)) {
+                return null;
+            }
+
+            return ['edge' => $defaultDuration, 'browser' => $defaultDuration];
+        }
+
+        // 4xx — short edge TTL, no browser cache by default
+        if ($statusCode >= 400) {
+            if (! config('cdn-headers.error_responses.cache_4xx', true)) {
+                return null;
+            }
+
+            return [
+                'edge' => (int) config('cdn-headers.error_responses.edge_ttl_4xx', 300),
+                'browser' => (int) config('cdn-headers.error_responses.browser_ttl_4xx', 0),
+            ];
+        }
+
+        // 3xx — short edge TTL, no browser cache by default
+        if (! config('cdn-headers.error_responses.cache_3xx', true)) {
+            return null;
+        }
+
+        return [
+            'edge' => (int) config('cdn-headers.error_responses.edge_ttl_3xx', 600),
+            'browser' => (int) config('cdn-headers.error_responses.browser_ttl_3xx', 0),
+        ];
+    }
+
+    /**
      * Apply CDN headers to response.
      *
      * @param  \Illuminate\Http\Response  $response
      */
-    protected function applyCdnHeaders($response, int $duration): void
+    protected function applyCdnHeaders($response, int $edgeTtl, ?int $browserTtl = null): void
     {
+        // Default browser TTL to edge TTL for backwards-compatible callers.
+        $browserTtl = $browserTtl ?? $edgeTtl;
+
         $directives = [
             'public',
-            "max-age={$duration}",
-            "s-maxage={$duration}",
+            "max-age={$browserTtl}",
+            "s-maxage={$edgeTtl}",
         ];
 
         // Add stale-while-revalidate if configured
@@ -200,9 +294,10 @@ class CdnHeadersMiddleware
 
         $response->headers->set('Cache-Control', implode(', ', $directives));
 
-        // Add Surrogate-Control header if configured
+        // Add Surrogate-Control header if configured. Surrogate-Control targets
+        // shared/CDN caches specifically, so it tracks the edge TTL.
         if (config('cdn-headers.surrogate_control', false)) {
-            $response->headers->set('Surrogate-Control', "max-age={$duration}");
+            $response->headers->set('Surrogate-Control', "max-age={$edgeTtl}");
         }
     }
 

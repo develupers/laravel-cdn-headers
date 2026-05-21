@@ -411,6 +411,175 @@ it('does not inject csrf loader when disabled', function () {
     expect($content)->not->toContain('fetch(');
 });
 
+it('respects an inner no-store directive and does not override it', function () {
+    // Guards against cache-poisoning: when inner middleware (e.g. a bot-block)
+    // explicitly returns no-store, this middleware must not overwrite it.
+    config(['cdn-headers.routes' => ['test.route' => 3600]]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = $this->middleware->handle($request, function () {
+        $response = new Response('blocked', 403);
+        $response->headers->set('Cache-Control', 'no-store, max-age=0, private');
+
+        return $response;
+    });
+
+    expect($response->headers->get('Cache-Control'))->toContain('no-store');
+    expect($response->headers->get('Cache-Control'))->not->toContain('public');
+    expect($response->headers->get('Cache-Control'))->not->toContain('s-maxage=3600');
+});
+
+it('still overrides weaker no-cache and private directives without no-store', function () {
+    // Documents that only `no-store` is honored — `no-cache` and `private`
+    // alone are often Laravel defaults that don't reflect explicit intent.
+    config(['cdn-headers.routes' => ['test.route' => 3600]]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = $this->middleware->handle($request, function () {
+        $response = new Response('test');
+        $response->headers->set('Cache-Control', 'no-cache, private');
+
+        return $response;
+    });
+
+    expect($response->headers->get('Cache-Control'))->toContain('public');
+    expect($response->headers->get('Cache-Control'))->toContain('max-age=3600');
+});
+
+it('applies the configured duration to successful 2xx responses', function () {
+    config(['cdn-headers.routes' => ['test.route' => 3600]]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = $this->middleware->handle($request, function () {
+        return new Response('ok', 200);
+    });
+
+    expect($response->headers->get('Cache-Control'))->toContain('public');
+    expect($response->headers->get('Cache-Control'))->toContain('max-age=3600');
+    expect($response->headers->get('Cache-Control'))->toContain('s-maxage=3600');
+});
+
+it('applies short edge ttl and zero browser ttl to 404 responses', function () {
+    // 404s should still be cached at the edge to protect the origin from
+    // bot-scan storms (slug-alias lookups can be heavy), but should not be
+    // cached in browsers — otherwise users see a stale 404 long after the
+    // resource is added.
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.error_responses.cache_4xx' => true,
+        'cdn-headers.error_responses.edge_ttl_4xx' => 300,
+        'cdn-headers.error_responses.browser_ttl_4xx' => 0,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = $this->middleware->handle($request, function () {
+        return new Response('not found', 404);
+    });
+
+    expect($response->headers->get('Cache-Control'))->toContain('public');
+    expect($response->headers->get('Cache-Control'))->toContain('max-age=0');
+    expect($response->headers->get('Cache-Control'))->toContain('s-maxage=300');
+    expect($response->headers->get('Cache-Control'))->not->toContain('s-maxage=3600');
+});
+
+it('applies short edge ttl and zero browser ttl to 301 redirects', function () {
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.error_responses.cache_3xx' => true,
+        'cdn-headers.error_responses.edge_ttl_3xx' => 600,
+        'cdn-headers.error_responses.browser_ttl_3xx' => 0,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = $this->middleware->handle($request, function () {
+        return new Response('', 301, ['Location' => '/somewhere-else']);
+    });
+
+    expect($response->headers->get('Cache-Control'))->toContain('public');
+    expect($response->headers->get('Cache-Control'))->toContain('max-age=0');
+    expect($response->headers->get('Cache-Control'))->toContain('s-maxage=600');
+});
+
+it('does not cache 5xx responses by default', function () {
+    // Transient origin errors must never propagate to other clients via cache.
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.error_responses.cache_5xx' => false,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = $this->middleware->handle($request, function () {
+        return new Response('server error', 500);
+    });
+
+    expect($response->headers->get('Cache-Control'))->not->toContain('public');
+    expect($response->headers->get('Cache-Control'))->not->toContain('s-maxage');
+});
+
+it('can opt out of 4xx caching entirely', function () {
+    // For sites that prefer to always hit origin on 4xx, cache_4xx can be off.
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.error_responses.cache_4xx' => false,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = $this->middleware->handle($request, function () {
+        return new Response('not found', 404);
+    });
+
+    expect($response->headers->get('Cache-Control'))->not->toContain('public');
+    expect($response->headers->get('Cache-Control'))->not->toContain('s-maxage');
+});
+
+it('uses edge ttl (not browser ttl) for surrogate-control on errors', function () {
+    config([
+        'cdn-headers.routes' => ['test.route' => 3600],
+        'cdn-headers.surrogate_control' => true,
+        'cdn-headers.error_responses.edge_ttl_4xx' => 300,
+        'cdn-headers.error_responses.browser_ttl_4xx' => 0,
+    ]);
+
+    Route::get('/test', fn () => 'test')->name('test.route');
+
+    $request = Request::create('/test', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = $this->middleware->handle($request, function () {
+        return new Response('not found', 404);
+    });
+
+    expect($response->headers->get('Surrogate-Control'))->toBe('max-age=300');
+});
+
 it('injects csrf loader only on specified routes', function () {
     config([
         'cdn-headers.routes' => ['test.route' => 3600, 'other.route' => 3600],
