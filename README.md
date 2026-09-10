@@ -20,20 +20,27 @@ Automatically set proper cache-control headers for CDN caching in Laravel applic
 - ⚡ Support for stale-while-revalidate and stale-if-error
 - 🌐 Works with any CDN (Cloudflare, Fastly, CloudFront, etc.)
 
+## Requirements
+
+- PHP 8.3 or higher
+- Laravel 11.x or 12.x
+
 ## Installation
 
 ### Install via Composer
 
-Since the package is not yet on Packagist, you need to add the GitHub repository to your `composer.json`:
+Install the package from [Packagist](https://packagist.org/packages/develupers/laravel-cdn-headers) by running this command in your Laravel application's root directory:
 
 ```bash
-composer config repositories.laravel-cdn-headers vcs https://github.com/develupers/laravel-cdn-headers
+composer require develupers/laravel-cdn-headers
 ```
 
-Then require the package:
+Laravel automatically discovers the service provider. No custom Composer repository or manual provider registration is required.
+
+If you previously followed the GitHub installation instructions, remove the old repository entry before running the command above:
 
 ```bash
-composer require develupers/laravel-cdn-headers:dev-main
+composer config --unset repositories.laravel-cdn-headers
 ```
 
 ### Publish Configuration
