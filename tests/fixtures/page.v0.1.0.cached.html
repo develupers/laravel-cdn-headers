@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="csrf-token" content="">
+    <script>window.Laravel = {/* CSRF token removed for caching */}</script>
+</head>
+<body>
+    <form method="POST">
+        <input type="hidden" name="_token" value="">
+    </form>
+<script>
+(function() {
+    // Check if forms exist or AJAX libraries are present
+    if (!document.querySelector('form') && !window.axios && typeof $ === 'undefined') return;
+    
+    // Load CSRF token
+    fetch('/users/csrf-token')
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            var token = data.csrf_token || data.token;
+            if (!token) return;
+            
+            // Update or create meta tag
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) {
+                meta.content = token;
+            } else {
+                // Create meta tag if it doesn't exist
+                meta = document.createElement('meta');
+                meta.name = 'csrf-token';
+                meta.content = token;
+                document.head.appendChild(meta);
+            }
+            
+            // Update window.Laravel
+            if (typeof window.Laravel === 'object') {
+                window.Laravel.csrfToken = token;
+            } else {
+                window.Laravel = { csrfToken: token };
+            }
+            
+            // Update form inputs
+            document.querySelectorAll('input[name="_token"]').forEach(function(input) {
+                input.value = token;
+            });
+            
+            // Configure axios if present
+            if (window.axios) {
+                window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
+            }
+            
+            // Configure jQuery AJAX if present
+            if (typeof $ !== 'undefined' && $.ajaxSetup) {
+                $.ajaxSetup({
+                    headers: { 'X-CSRF-TOKEN': token }
+                });
+            }
+        })
+        .catch(function(error) {
+            console.error('Failed to load CSRF token:', error);
+        });
+})();
+</script>
+</body>
+</html>
