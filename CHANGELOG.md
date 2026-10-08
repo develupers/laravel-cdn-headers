@@ -2,7 +2,16 @@
 
 All notable changes to `laravel-cdn-headers` will be documented in this file.
 
-## Unreleased
+## 0.2.0 - 2026-10-07
+
+### Added
+- Single-use request nonces, opt-in via the new `nonce` config block (disabled by default). Unlike a CSRF token, a nonce is spent by the first request that presents it and is bound to the session it was issued to — for endpoints that must not be replayed, such as requests that trigger paid third-party calls.
+  - `@nonceMeta` Blade directive renders the nonce meta tag and a script exposing `window.CdnHeaders.ready` / `refresh()` and a `cdn-headers:tokens-loaded` event.
+  - The CDN middleware blanks the nonce on cached pages, exactly like the CSRF token; the script then fetches fresh tokens from the CSRF endpoint, so those pages skip the CSRF loader.
+  - `cdn-headers.nonce` middleware rejects requests without a valid, unspent nonce (403).
+  - `NonceManager::issue()` for the CSRF endpoint to return a `nonce` field; per-session issuance limits (per minute, per day).
+
+## 0.1.0 - 2026-09-09
 
 ### Added
 - Status-aware caching via the new `error_responses` config block. 3xx and 4xx responses now receive a separate, shorter edge TTL with a zero browser TTL by default; 5xx responses are not cached at all. This protects the origin from bot-scan storms on missing-resource lookups while ensuring users do not get locked into stale errors via browser cache.

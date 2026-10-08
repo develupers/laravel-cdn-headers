@@ -6,7 +6,10 @@ use Develupers\CdnHeaders\Commands\CdnHeadersClearCommand;
 use Develupers\CdnHeaders\Commands\CdnHeadersStatusCommand;
 use Develupers\CdnHeaders\Commands\CdnHeadersTestCommand;
 use Develupers\CdnHeaders\Http\Middleware\CdnHeadersMiddleware;
+use Develupers\CdnHeaders\Http\Middleware\VerifyRequestNonce;
+use Develupers\CdnHeaders\Nonce\NonceManager;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Support\Facades\Blade;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -28,6 +31,10 @@ class CdnHeadersServiceProvider extends PackageServiceProvider
     {
         // Register middleware alias
         $this->app['router']->aliasMiddleware('cdn-headers', CdnHeadersMiddleware::class);
+        $this->app['router']->aliasMiddleware('cdn-headers.nonce', VerifyRequestNonce::class);
+
+        // Renders nothing while the nonce feature is disabled
+        Blade::directive('nonceMeta', fn () => '<?php echo app(\\'.NonceManager::class.'::class)->tags(); ?>');
 
         // Auto-register as global middleware if configured
         if (config('cdn-headers.middleware_registration') === 'global') {

@@ -3,6 +3,8 @@
 namespace Develupers\CdnHeaders\Http\Middleware;
 
 use Closure;
+use Develupers\CdnHeaders\Nonce\NonceManager;
+use Develupers\CdnHeaders\Nonce\TokenScript;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -86,6 +88,11 @@ class CdnHeadersMiddleware
         // Remove CSRF tokens if configured
         if (config('cdn-headers.remove_csrf_tokens', true)) {
             $this->removeCsrfTokens($response);
+        }
+
+        // A nonce is single-use: one baked into a cached page would be spent by the first visitor
+        if (app(NonceManager::class)->enabled()) {
+            $this->removeNonce($response);
         }
 
         // Inject CSRF loader if configured and tokens were removed
@@ -394,6 +401,30 @@ class CdnHeadersMiddleware
     }
 
     /**
+     * Blank the request nonce meta tag in HTML responses.
+     *
+     * @param  Response  $response
+     */
+    protected function removeNonce($response): void
+    {
+        if (! str_contains($response->headers->get('Content-Type', ''), 'text/html')) {
+            return;
+        }
+
+        $name = app(NonceManager::class)->metaName();
+
+        $content = preg_replace(
+            '/<meta\s+name=["\']'.preg_quote($name, '/').'["\']\s+content=["\'][^"\']*["\']\s*\/?>/i',
+            '<meta name="'.$name.'" content="">',
+            $response->getContent()
+        );
+
+        if ($content !== null) {
+            $response->setContent($content);
+        }
+    }
+
+    /**
      * Inject CSRF loader script into HTML responses.
      *
      * @param  Response  $response
@@ -403,6 +434,11 @@ class CdnHeadersMiddleware
         // Only process HTML responses
         $contentType = $response->headers->get('Content-Type', '');
         if (! str_contains($contentType, 'text/html')) {
+            return;
+        }
+
+        // Pages rendering @nonceMeta carry their own token script, which also fills the CSRF token
+        if (app(NonceManager::class)->enabled() && str_contains($response->getContent(), TokenScript::MARKER)) {
             return;
         }
 

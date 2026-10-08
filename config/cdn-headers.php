@@ -114,6 +114,38 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Request Nonces
+    |--------------------------------------------------------------------------
+    |
+    | Single-use tokens for endpoints that must not be replayed (e.g. requests
+    | that cost money). Unlike a CSRF token, a nonce is spent by the first
+    | request that presents it and is bound to the session it was issued to.
+    |
+    | - Render @nonceMeta in the page <head>. On CDN-cached pages the nonce is
+    |   blanked and fetched from the CSRF endpoint instead.
+    | - The CSRF endpoint must also return a 'nonce' field, issued with
+    |   app(NonceManager::class)->issue().
+    | - Protect routes with the 'cdn-headers.nonce' middleware, which reads the
+    |   nonce from the configured header.
+    |
+    | Single-use relies on an atomic cache `add` (Redis, Memcached, database).
+    | Per-session limits cap how many nonces one session can be issued; set a
+    | limit to null to disable it.
+    |
+    */
+    'nonce' => [
+        'enabled' => env('CDN_HEADERS_NONCE_ENABLED', false),
+        'ttl' => env('CDN_HEADERS_NONCE_TTL', 1800), // seconds
+        'per_session_limit' => [
+            'per_minute' => env('CDN_HEADERS_NONCE_PER_MINUTE', 30),
+            'per_day' => env('CDN_HEADERS_NONCE_PER_DAY', 500),
+        ],
+        'meta_name' => 'request-nonce',
+        'header' => 'X-Request-Nonce',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Enable Logging
     |--------------------------------------------------------------------------
     |
