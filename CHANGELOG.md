@@ -2,6 +2,11 @@
 
 All notable changes to `laravel-cdn-headers` will be documented in this file.
 
+## 0.2.1 - 2026-10-08
+
+### Changed
+- Sessions that have used up their nonce budget now get **429 Too Many Requests** with `Retry-After` (and `retry_after` in JSON responses) instead of the 403 used for missing or invalid nonces, so clients can stop retrying and tell the visitor when to try again. `NonceManager::retryAfter()` reports the wait without counting an attempt.
+
 ## 0.2.0 - 2026-10-07
 
 ### Added

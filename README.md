@@ -381,7 +381,7 @@ Route::get('/users/csrf-token', function (NonceManager $nonces) {
 Route::post('/expensive', ExpensiveController::class)->middleware('cdn-headers.nonce');
 ```
 
-Requests without a valid, unspent nonce from their own session receive a 403. The middleware passes everything through while nonces are disabled.
+Requests without a valid, unspent nonce from their own session receive a 403. Once a session has used up its nonce budget, it gets a **429** instead, with a `Retry-After` header (and `retry_after` in JSON responses), so clients can stop retrying and tell the visitor when to try again. The middleware passes everything through while nonces are disabled.
 
 **4. Send the nonce from the browser:**
 
@@ -402,7 +402,7 @@ A `cdn-headers:tokens-loaded` event is also dispatched on `document` whenever to
 
 **Notes:**
 - Single use relies on an atomic cache `add`. Redis, Memcached and database stores provide it; the file store does not.
-- Per-session limits cap how many nonces one session can be issued. Past the limit, `issue()` returns `null` and requests from that session are rejected until the window resets.
+- Per-session limits cap how many nonces one session can be issued. Past the limit, `issue()` returns `null` and requests from that session get a 429 until the window resets. `NonceManager::retryAfter()` reports the wait without counting an attempt.
 - The lifetime can be generous: single use is what prevents replay, not a short TTL.
 
 ## Testing

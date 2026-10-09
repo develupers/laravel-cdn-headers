@@ -195,3 +195,60 @@ it('passes requests through while disabled', function () {
 it('registers the cdn-headers.nonce middleware alias', function () {
     expect(app('router')->getMiddleware())->toHaveKey('cdn-headers.nonce', VerifyRequestNonce::class);
 });
+
+it('reports when a session can be issued nonces again, without counting an attempt', function () {
+    config(['cdn-headers.nonce.per_session_limit' => ['per_minute' => 2, 'per_day' => null]]);
+    $request = nonceRequest();
+
+    foreach (range(1, 5) as $i) {
+        expect($this->nonces->retryAfter($request))->toBeNull();
+    }
+
+    $this->nonces->issue($request);
+    $this->nonces->issue($request);
+
+    expect($this->nonces->retryAfter($request))->toBeGreaterThanOrEqual(1)->toBeLessThanOrEqual(60);
+    expect($this->nonces->retryAfter(nonceRequest()))->toBeNull();
+});
+
+it('reports the daily window when that is the one used up', function () {
+    config(['cdn-headers.nonce.per_session_limit' => ['per_minute' => null, 'per_day' => 1]]);
+    $request = nonceRequest();
+    $this->nonces->issue($request);
+
+    expect($this->nonces->retryAfter($request))->toBeGreaterThan(3600);
+});
+
+it('answers 429 with Retry-After once the session has used up its nonce budget', function () {
+    config(['cdn-headers.nonce.per_session_limit' => ['per_minute' => 1, 'per_day' => null]]);
+    $request = nonceRequest();
+    $this->nonces->issue($request);
+    $request->headers->set('Accept', 'application/json');
+
+    $response = app(VerifyRequestNonce::class)->handle($request, fn () => 'ok');
+
+    expect($response->getStatusCode())->toBe(429);
+    expect((int) $response->headers->get('Retry-After'))->toBeGreaterThanOrEqual(1);
+    expect($response->getData(true))
+        ->toMatchArray(['message' => 'Request nonce limit reached.'])
+        ->toHaveKey('retry_after');
+});
+
+it('answers 429 to non-JSON requests through the exception handler', function () {
+    config(['cdn-headers.nonce.per_session_limit' => ['per_minute' => 1, 'per_day' => null]]);
+    $request = nonceRequest();
+    $this->nonces->issue($request);
+
+    expect(fn () => app(VerifyRequestNonce::class)->handle($request, fn () => 'ok'))
+        ->toThrow(fn (HttpException $e) => expect($e->getStatusCode())->toBe(429)
+            ->and($e->getHeaders())->toHaveKey('Retry-After'));
+});
+
+it('still accepts a nonce issued within budget after the budget is used up', function () {
+    config(['cdn-headers.nonce.per_session_limit' => ['per_minute' => 1, 'per_day' => null]]);
+    $request = nonceRequest();
+    $request->headers->set('X-Request-Nonce', $this->nonces->issue($request));
+
+    expect($this->nonces->retryAfter($request))->not->toBeNull();
+    expect(app(VerifyRequestNonce::class)->handle($request, fn () => 'ok'))->toBe('ok');
+});
