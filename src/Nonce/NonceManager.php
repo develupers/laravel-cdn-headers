@@ -96,20 +96,58 @@ class NonceManager
             .TokenScript::render(config('cdn-headers.csrf_endpoint', '/users/csrf-token'), $this->metaName());
     }
 
+    /**
+     * Seconds until the request's session can be issued nonces again, or null while it is within its limits.
+     * Read-only: unlike issue(), it never counts an attempt.
+     */
+    public function retryAfter(?Request $request = null): ?int
+    {
+        $session = $this->sessionHash($request ?? request());
+
+        if ($session === null) {
+            return null;
+        }
+
+        $wait = null;
+
+        foreach ($this->limits() as $window => [$max]) {
+            $key = $this->limitKey($window, $session);
+
+            if ($max !== null && $this->limiter->tooManyAttempts($key, (int) $max)) {
+                $wait = max($wait ?? 1, $this->limiter->availableIn($key));
+            }
+        }
+
+        return $wait;
+    }
+
     private function overLimit(string $session): bool
     {
-        $windows = [
-            'minute' => [config('cdn-headers.nonce.per_session_limit.per_minute', 30), 60],
-            'day' => [config('cdn-headers.nonce.per_session_limit.per_day', 500), 86400],
-        ];
-
-        foreach ($windows as $window => [$max, $decaySeconds]) {
-            if ($max !== null && $this->limiter->hit("cdn-headers:nonce-limit:{$window}:{$session}", $decaySeconds) > (int) $max) {
+        foreach ($this->limits() as $window => [$max, $decaySeconds]) {
+            if ($max !== null && $this->limiter->hit($this->limitKey($window, $session), $decaySeconds) > (int) $max) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Per-session issuance windows: name => [max nonces (null = unlimited), window in seconds].
+     *
+     * @return array<string, array{0: int|string|null, 1: int}>
+     */
+    private function limits(): array
+    {
+        return [
+            'minute' => [config('cdn-headers.nonce.per_session_limit.per_minute', 30), 60],
+            'day' => [config('cdn-headers.nonce.per_session_limit.per_day', 500), 86400],
+        ];
+    }
+
+    private function limitKey(string $window, string $session): string
+    {
+        return "cdn-headers:nonce-limit:{$window}:{$session}";
     }
 
     private function sessionHash(Request $request): ?string

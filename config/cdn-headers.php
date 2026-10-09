@@ -130,7 +130,8 @@ return [
     |
     | Single-use relies on an atomic cache `add` (Redis, Memcached, database).
     | Per-session limits cap how many nonces one session can be issued; set a
-    | limit to null to disable it.
+    | limit to null to disable it. Past a limit, protected requests get a 429
+    | with Retry-After instead of the 403 used for missing or invalid nonces.
     |
     */
     'nonce' => [
