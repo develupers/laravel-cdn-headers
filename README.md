@@ -351,8 +351,11 @@ Nonces are disabled by default. To enable them:
     ],
     'meta_name' => 'request-nonce',
     'header' => 'X-Request-Nonce',
+    'store' => env('CDN_HEADERS_NONCE_STORE'), // null = the default cache store
 ],
 ```
+
+Every page view that renders `@nonceMeta` writes a few short-lived cache keys (the nonce, its spent marker and the per-session limits). On the `database` cache store expired rows are only removed when the same key is read again, so they pile up; point `store` at a store that expires keys itself, such as `redis`, to keep them out of your database.
 
 **1. Render the nonce in your layout's `<head>`:**
 
