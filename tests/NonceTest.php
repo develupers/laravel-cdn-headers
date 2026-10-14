@@ -117,6 +117,38 @@ it('does not limit a window set to null', function () {
     }
 });
 
+it('keeps nonces and their limits in the default cache store when no store is set', function () {
+    $request = nonceRequest();
+    $nonce = $this->nonces->issue($request);
+
+    $session = hash('sha256', $request->session()->getId());
+
+    expect(cache()->store()->has('cdn-headers:nonce:'.hash('sha256', $nonce)))->toBeTrue()
+        ->and(cache()->store()->has("cdn-headers:nonce-limit:minute:{$session}"))->toBeTrue();
+});
+
+it('keeps nonces and their limits in the configured store', function () {
+    config([
+        'cache.stores.nonces' => ['driver' => 'array'],
+        'cdn-headers.nonce.store' => 'nonces',
+    ]);
+
+    $nonces = app(NonceManager::class);
+    $request = nonceRequest();
+    $nonce = $nonces->issue($request);
+
+    $key = 'cdn-headers:nonce:'.hash('sha256', $nonce);
+    $limit = 'cdn-headers:nonce-limit:minute:'.hash('sha256', $request->session()->getId());
+
+    expect(cache()->store('nonces')->has($key))->toBeTrue()
+        ->and(cache()->store('nonces')->has($limit))->toBeTrue()
+        ->and(cache()->store()->has($key))->toBeFalse()
+        ->and(cache()->store()->has($limit))->toBeFalse();
+
+    expect($nonces->consume($nonce, $request))->toBeTrue()
+        ->and($nonces->consume($nonce, $request))->toBeFalse();
+});
+
 it('renders the nonce meta tag and token script', function () {
     nonceRequest();
 

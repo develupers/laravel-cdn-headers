@@ -143,6 +143,9 @@ return [
         ],
         'meta_name' => 'request-nonce',
         'header' => 'X-Request-Nonce',
+        // Cache store for the nonces and their issuance limits (null = the default store). Every page view
+        // writes a few short-lived keys, so a store that expires them itself (e.g. redis) suits them best.
+        'store' => env('CDN_HEADERS_NONCE_STORE'),
     ],
 
     /*

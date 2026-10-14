@@ -2,6 +2,11 @@
 
 All notable changes to `laravel-cdn-headers` will be documented in this file.
 
+## 0.2.2 - 2026-10-14
+
+### Added
+- `nonce.store` (`CDN_HEADERS_NONCE_STORE`) chooses the cache store for nonces and their per-session issuance limits. Unset, they keep using the application's default cache and rate limiter, so nothing changes until it is set.
+
 ## 0.2.1 - 2026-10-08
 
 ### Changed
